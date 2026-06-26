@@ -210,6 +210,12 @@ const SK = 'pram_rad_v2';
 const PK = 'pram_rad_pw';
 const DEFAULT_PW = 'pram2026';
 
+const GIST_ID = 'b75c659d38518125dd0d777ed8a482d7';
+const GIST_FILE = 'pram-data.json';
+const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
+function getToken(){ try{ return localStorage.getItem('pram_gist_token')||''; }catch(e){ return ''; } }
+function setToken(t){ try{ localStorage.setItem('pram_gist_token',t); }catch(e){} }
+
 const PHASES = ['Discovery','Design','Build','Test','Rollout'];
 const RAG = {green:'#16a34a',amber:'#d97706',red:'#dc2626',none:null};
 
@@ -250,16 +256,48 @@ const DEFAULTS = {
 let D = JSON.parse(JSON.stringify(DEFAULTS));
 let unlocked = false;
 
-function load(){
+async function load(){
+  try{
+    const r = await fetch(GIST_API, {
+      headers:{'Authorization':`token ${getToken()}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    if(r.ok){
+      const g = await r.json();
+      const content = g.files[GIST_FILE]?.content;
+      if(content && content.trim() !== '{}'){
+        D = JSON.parse(content);
+        localStorage.setItem(SK, content);
+        return;
+      }
+    }
+  }catch(e){}
   try{ const v=localStorage.getItem(SK); if(v) D=JSON.parse(v); }catch(e){}
 }
-function save(){
+
+async function save(){
+  const token = getToken();
+  if(!token){ alert('No GitHub token set — go to Settings and enter your token first.'); return; }
+  const json = JSON.stringify(D, null, 2);
+  const saveEl = document.getElementById('save-ok');
+  if(saveEl) saveEl.textContent = '⏳ Saving…';
   try{
-    localStorage.setItem(SK,JSON.stringify(D));
-    const el=document.getElementById('save-ok');
-    if(el){el.textContent='✓ Saved '+new Date().toLocaleTimeString();setTimeout(()=>{if(el)el.textContent=''},3000);}
+    const r = await fetch(GIST_API, {
+      method:'PATCH',
+      headers:{
+        'Authorization':`token ${token}`,
+        'Accept':'application/vnd.github.v3+json',
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({files:{[GIST_FILE]:{content:json}}})
+    });
+    if(!r.ok) throw new Error(`GitHub returned ${r.status}`);
+    localStorage.setItem(SK, json);
+    if(saveEl){saveEl.textContent='✓ Saved to Gist '+new Date().toLocaleTimeString();setTimeout(()=>{if(saveEl)saveEl.textContent=''},4000);}
     renderRadiator();
-  }catch(e){alert('Save failed: '+e.message);}
+  }catch(e){
+    if(saveEl) saveEl.textContent='';
+    alert('Save failed: '+e.message);
+  }
 }
 
 function getPassword(){
@@ -606,7 +644,29 @@ function renderSettings(){
     </div>
 
     <div class="s-card">
-      <div class="s-card-title">🔑 Change password</div>
+      <div class="s-card-title">🔑 GitHub token (stored locally only — never in the HTML file)</div>
+      <div class="pw-change">
+        <div class="pw-change-title">Personal Access Token (gist scope)</div>
+        <div class="s-row">
+          <div class="s-field" style="flex:1">
+            <div class="s-lbl">Token</div>
+            <input class="s-in w-full" type="password" id="gist-token-input"
+              placeholder="ghp_…"
+              value="${getToken()}"
+              style="font-family:monospace"/>
+          </div>
+          <button class="btn btn-gold btn-sm" style="align-self:flex-end"
+            onclick="setToken(document.getElementById('gist-token-input').value);document.getElementById('token-msg').textContent='✓ Token saved locally';setTimeout(()=>document.getElementById('token-msg').textContent='',3000)">
+            Save token
+          </button>
+        </div>
+        <div id="token-msg" style="font-size:12px;color:var(--green);margin-top:4px"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">This token is saved only in your browser's localStorage — it is never written to the HTML file or pushed to GitHub.</div>
+      </div>
+    </div>
+
+    <div class="s-card">
+      <div class="s-card-title">🔒 Change settings password</div>
       <div class="pw-change">
         <div class="pw-change-title">Settings password</div>
         <div class="s-row">
@@ -649,8 +709,8 @@ function logoFile(f){
   r.readAsDataURL(f);
 }
 
-function init(){
-  load();
+async function init(){
+  await load();
   renderRadiator();
 }
 
