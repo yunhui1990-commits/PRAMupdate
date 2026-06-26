@@ -257,20 +257,20 @@ let D = JSON.parse(JSON.stringify(DEFAULTS));
 let unlocked = false;
 
 async function load(){
+  // Raw Gist URL works without auth for any gist (secret or public)
+  const rawUrl = `https://gist.githubusercontent.com/yunhui1990/${GIST_ID}/raw/${GIST_FILE}`;
   try{
-    const r = await fetch(GIST_API, {
-      headers:{'Authorization':`token ${getToken()}`,'Accept':'application/vnd.github.v3+json'}
-    });
+    const r = await fetch(rawUrl + '?t=' + Date.now()); // cache-bust
     if(r.ok){
-      const g = await r.json();
-      const content = g.files[GIST_FILE]?.content;
-      if(content && content.trim() !== '{}'){
-        D = JSON.parse(content);
-        localStorage.setItem(SK, content);
+      const text = await r.text();
+      if(text && text.trim() !== '{}' && text.trim() !== ''){
+        D = JSON.parse(text);
+        localStorage.setItem(SK, text);
         return;
       }
     }
   }catch(e){}
+  // Fallback: localStorage cache
   try{ const v=localStorage.getItem(SK); if(v) D=JSON.parse(v); }catch(e){}
 }
 
@@ -710,8 +710,12 @@ function logoFile(f){
 }
 
 async function init(){
-  await load();
+  // Render defaults immediately so page is never blank
   renderRadiator();
+  // Then try to load from Gist and re-render if we got data
+  const before = JSON.stringify(D);
+  await load();
+  if(JSON.stringify(D) !== before) renderRadiator();
 }
 
 function drawArrows(){
