@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PRAM — Live Bidding Engine</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#FAF8F4;color:#1a1a1a;min-height:100vh}
+:root{
+  --gold:#C79A3E;--gold-light:#E8A020;--gold-pale:#FDF3E0;--gold-border:#E8D5A0;
+  --black:#161616;--card:#FFFFFF;--cream:#FAF8F4;--cream2:#F2EFE8;
+  --border:#E0DDD5;--text:#1a1a1a;--muted:#666;--muted2:#999;
+  --green:#16a34a;--green-bg:#DCFCE7;--amber:#b45309;--amber-bg:#FEF3C7;
+  --red:#dc2626;--red-bg:#FEE2E2;
+}
+
+/* ── RADIATOR ─────────────────────────────── */
+.radiator{max-width:1360px;margin:0 auto;padding:32px 36px 48px}
+
+.rad-header{background:var(--black);border-radius:10px 10px 0 0;padding:22px 28px 18px;margin-bottom:0;display:flex;align-items:flex-end;justify-content:space-between}
+.rad-title{color:var(--gold-light);font-size:22px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;line-height:1.2}
+.rad-date{color:#aaa;font-size:13px;margin-top:4px}
+.rad-header-right{text-align:right}
+.prog-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px}
+
+.summary-band{background:var(--gold-pale);border:1px solid var(--gold-border);border-top:none;border-radius:0;padding:16px 28px;display:flex;gap:28px;flex-wrap:wrap}
+.summary-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);font-weight:700;white-space:nowrap;margin-top:2px}
+.summary-items{display:flex;flex-direction:column;gap:5px;flex:1}
+.summary-item{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#3a2a0a;line-height:1.45}
+.sum-bullet{color:var(--gold);font-size:10px;margin-top:3px;flex-shrink:0}
+
+.table-wrap{background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+.col-headers{display:grid;grid-template-columns:240px minmax(0,1fr) 180px 58px 180px;gap:8px;padding:10px 18px;background:var(--cream2);border-bottom:2px solid var(--gold-border)}
+.col-h{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+
+.comp-row{display:grid;grid-template-columns:240px minmax(0,1fr) 180px 58px 180px;gap:8px;align-items:center;padding:7px 18px;border-bottom:1px solid var(--border);transition:background .1s}
+.comp-row:hover{background:#F7F5EF}
+.comp-row.alt{background:#FDFCF9}
+.comp-row.sub{background:#F5F3EE;padding:5px 18px 5px 30px}
+.comp-row.sub:hover{background:#EEECe7}
+.comp-name-wrap{display:flex;flex-direction:column;gap:2px}
+
+/* ── CONDUCTOR DIAGRAM ───────────────────── */
+.conductor-section{margin-top:28px;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.conductor-header{background:var(--black);padding:14px 22px;display:flex;align-items:center;justify-content:space-between}
+.conductor-title{color:var(--gold-light);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.conductor-sub{color:#888;font-size:12px}
+.conductor-body{padding:24px;background:#F7F5F0}
+.conductor-diagram{display:grid;grid-template-columns:1fr 160px 1fr;gap:0;align-items:center;min-height:280px}
+.cond-left{display:flex;flex-direction:column;gap:16px;padding-right:20px}
+.cond-right{display:flex;flex-direction:column;gap:16px;padding-left:20px}
+.cond-label{font-size:11px;font-style:italic;color:#999;margin-bottom:4px}
+.cond-card{border-radius:8px;padding:12px 16px}
+.cond-card-blue{background:#E6F1FB;border:1px solid #85B7EB}
+.cond-card-teal{background:#E1F5EE;border:1px solid #5DCAA5}
+.cond-card-title{font-size:13px;font-weight:700;color:#0C447C;margin-bottom:2px}
+.cond-card-teal .cond-card-title{color:#085041}
+.cond-card-sub{font-size:11px;color:#185FA5}
+.cond-card-teal .cond-card-sub{color:#0F6E56}
+.cond-center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.cond-hub{background:var(--black);border-radius:50%;width:130px;height:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;flex-shrink:0}
+.cond-hub-title{color:#fff;font-size:13px;font-weight:700}
+.cond-hub-role{color:var(--gold-light);font-size:11px;margin-top:2px}
+.cond-hub-sub{color:#aaa;font-size:10px;margin-top:3px}
+.cond-canvas{position:absolute;inset:0;pointer-events:none}
+@keyframes dashin{to{stroke-dashoffset:-22}}
+@keyframes dashout{to{stroke-dashoffset:22}}
+.comp-name{font-size:13.5px;font-weight:600;color:var(--text)}
+.comp-sub-label{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);margin-left:8px}
+.comp-sub-label::before{content:'';width:8px;height:1px;background:#ccc}
+
+.phases{display:flex;gap:0;align-items:center;justify-content:space-between;width:100%}
+.ph{font-size:8.5px;font-weight:700;padding:3px 4px;border-radius:3px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;text-align:center;flex:1;margin:0 2px}
+.ph-done{background:var(--black);color:#888}
+.ph-active{background:#2563eb;color:#fff}
+.ph-upcoming{background:#e8e6e0;color:#aaa;border:1px solid #d8d5cc}
+.ph-na{background:transparent;color:#bbb;border:1px solid #e0ddd5;text-decoration:line-through}
+
+.prog-wrap{display:flex;flex-direction:column;gap:3px}
+.prog-track{background:#E8E5DE;border-radius:20px;height:9px;overflow:hidden}
+.prog-fill{height:100%;border-radius:20px;background:var(--gold-light);transition:width .4s}
+.prog-pct{font-size:11px;color:var(--muted);font-weight:600}
+
+.rag-wrap{display:flex;justify-content:center}
+.rag-dot{width:15px;height:15px;border-radius:50%}
+
+.effort-text{font-size:12px;color:var(--muted);line-height:1.4}
+
+.milestone-band{padding:8px 18px}
+.milestone-line{display:flex;align-items:center;gap:0}
+.mile-dash{flex:1;height:0;border-top:2px dashed var(--gold)}
+.mile-chip{background:var(--black);color:var(--gold-light);font-size:10px;font-weight:700;letter-spacing:.07em;padding:4px 16px;border-radius:20px;white-space:nowrap;text-transform:uppercase;border:none}
+
+.logo-row{display:flex;justify-content:flex-end;padding-top:20px}
+.logo-img{max-height:52px;max-width:180px;object-fit:contain;opacity:.8}
+
+.legend-row{display:flex;gap:18px;align-items:center;padding:16px 18px 18px;border-top:1px solid var(--border);flex-wrap:wrap;background:var(--cream2)}
+.leg{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.leg-dot{width:10px;height:10px;border-radius:50%}
+.leg-box{width:22px;height:10px;border-radius:2px}
+
+.lock-btn{position:fixed;bottom:16px;right:18px;background:transparent;border:none;cursor:pointer;opacity:.18;transition:opacity .2s;font-size:16px;padding:6px;color:#666;z-index:200}
+.lock-btn:hover{opacity:.6}
+
+/* ── PASSWORD MODAL ──────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:10px;padding:28px 32px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-title{font-size:16px;font-weight:700;color:var(--black);margin-bottom:6px}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:18px}
+.modal input{width:100%;border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:14px;margin-bottom:14px;font-family:inherit}
+.modal input:focus{outline:none;border-color:var(--gold)}
+.modal-error{font-size:12px;color:var(--red);margin-bottom:10px;min-height:16px}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end}
+.btn{padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+.btn-gold{background:var(--gold-light);color:#fff}
+.btn-gold:hover{background:var(--gold)}
+.btn-ghost{background:var(--cream2);color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text)}
+.btn-sm{padding:5px 13px;font-size:12px}
+.btn-danger{background:#FEE2E2;color:var(--red);border:1px solid #fca5a5}
+
+/* ── SETTINGS ────────────────────────────── */
+.settings-wrap{display:none;max-width:1060px;margin:0 auto;padding:28px 32px 60px}
+.settings-header{display:flex;align-items:center;gap:14px;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid var(--gold-border)}
+.settings-title{font-size:18px;font-weight:700;color:var(--black)}
+.settings-sub{font-size:13px;color:var(--muted);margin-top:2px}
+.close-settings{margin-left:auto}
+
+.save-bar{position:sticky;top:0;z-index:99;background:#fff;border-bottom:1px solid var(--border);padding:10px 0 10px;display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.save-ok{font-size:12px;color:var(--green);font-weight:600}
+
+.s-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px 22px;margin-bottom:16px}
+.s-card-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.s-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}
+.s-field{display:flex;flex-direction:column;gap:4px}
+.s-lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.s-in{background:#FAF8F4;border:1px solid var(--border);border-radius:5px;padding:7px 10px;color:var(--text);font-size:13px;font-family:inherit}
+.s-in:focus{outline:none;border-color:var(--gold)}
+.s-in.w-full{width:100%}
+.s-in.w-lg{width:320px}
+.s-in.w-md{width:180px}
+.s-in.w-sm{width:90px}
+.s-in.w-xs{width:70px}
+select.s-in{cursor:pointer}
+
+.comp-card{background:var(--cream);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:10px}
+.comp-card-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sub-card{background:#fff;border:1px solid #e8e5de;border-radius:5px;padding:10px 12px;margin:8px 0 0 12px}
+
+.phase-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.phase-col{display:flex;flex-direction:column;align-items:center;gap:3px}
+.ph-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+
+.rag-row{display:flex;gap:6px;align-items:center}
+.rag-opt{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s;flex-shrink:0}
+.rag-opt:hover{transform:scale(1.1)}
+.rag-opt.sel{border-color:var(--black);transform:scale(1.18)}
+
+.sum-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.sum-row input{flex:1;background:#FAF8F4;border:1px solid var(--border);border-radius:5px;padding:7px 10px;font-size:13px;font-family:inherit;color:var(--text)}
+.sum-row input:focus{outline:none;border-color:var(--gold)}
+
+.mile-row{background:#FAF8F4;border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+
+.drop-zone{border:2px dashed var(--border);border-radius:8px;padding:22px;text-align:center;cursor:pointer;color:var(--muted);font-size:13px;transition:all .2s;background:var(--cream2)}
+.drop-zone:hover,.drop-zone.over{border-color:var(--gold);color:var(--gold);background:var(--gold-pale)}
+
+.pw-change{background:var(--cream2);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-top:12px}
+.pw-change-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<!-- RADIATOR VIEW -->
+<div id="radiator-view">
+  <div class="radiator" id="rad-content"></div>
+  <button class="lock-btn" onclick="openLock()" title="Settings">🔒</button>
+</div>
+
+<!-- PASSWORD MODAL -->
+<div class="modal-overlay" id="pw-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Settings access</div>
+    <div class="modal-sub">Enter the settings password to continue.</div>
+    <input type="password" id="pw-input" placeholder="Password"
+      onkeydown="if(event.key==='Enter')checkPassword()"/>
+    <div class="modal-error" id="pw-error"></div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeLock()">Cancel</button>
+      <button class="btn btn-gold" onclick="checkPassword()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS VIEW -->
+<div class="settings-wrap" id="settings-view">
+  <div class="settings-header">
+    <div>
+      <div class="settings-title">⚙️ Settings</div>
+      <div class="settings-sub">Changes are saved to browser storage — click Save before closing.</div>
+    </div>
+    <button class="btn btn-ghost close-settings" onclick="closeSettings()">← Back to radiator</button>
+  </div>
+  <div id="settings-body"></div>
+</div>
+
+<script>
+const SK = 'pram_rad_v2';
+const PK = 'pram_rad_pw';
+const DEFAULT_PW = 'pram2026';
+
+const PHASES = ['Discovery','Design','Build','Test','Rollout'];
+const RAG = {green:'#16a34a',amber:'#d97706',red:'#dc2626',none:null};
+
+const DEFAULTS = {
+  title:'Live Bidding Engine Project — Information Radiator',
+  date:'2026-06-17',
+  summary:[
+    'All six components now in active build phase — programme on track',
+    'Clerk Console (critical path) at 51% — back-end majority complete, front-end foundations done',
+    'Testing Gateway 1 approaching as Clerk Console and Registration Engine near completion',
+    'Single combined release confirmed: BBE and AM components launch together'
+  ],
+  components:[
+    {id:'c0',name:'Foundational Work',subRows:[],phases:['done','done','done','na','na'],progress:100,rag:'none',effort:'Background work from April 2025 – June 2026'},
+    {id:'c1',name:'Clerk Console',subRows:[],phases:['done','done','active','upcoming','upcoming'],progress:51,rag:'green',effort:"4 of 6 months remaining (Oct '26)"},
+    {id:'c2',name:'Registration Engine: Live Auctions',subRows:[],phases:['done','done','upcoming','upcoming','upcoming'],progress:8,rag:'green',effort:'Sizing in progress'},
+    {id:'c3',name:'Auctioneer Console',subRows:[],phases:['done','done','active','upcoming','upcoming'],progress:14,rag:'green',effort:'Sizing in progress'},
+    {id:'c4',name:'Auction Room Display',subRows:[],phases:['done','done','upcoming','upcoming','upcoming'],progress:25,rag:'green',effort:'Sizing in progress'},
+    {id:'c5',name:'Live Bidding Page',subRows:[
+      {id:'c5a',label:'WEB',phases:['done','done','active','upcoming','upcoming'],progress:7,rag:'green'},
+      {id:'c5b',label:'APP',phases:['done','active','upcoming','upcoming','upcoming'],progress:0,rag:'green'}
+    ],phases:['done','done','active','upcoming','upcoming'],progress:4,rag:'green',effort:'Sizing in progress'},
+    {id:'c6',name:'Auction & Lot Details',subRows:[
+      {id:'c6a',label:'WEB',phases:['done','done','upcoming','upcoming','upcoming'],progress:5,rag:'green'},
+      {id:'c6b',label:'APP',phases:['done','done','upcoming','upcoming','upcoming'],progress:6,rag:'green'}
+    ],phases:['done','done','upcoming','upcoming','upcoming'],progress:6,rag:'green',effort:'Sizing in progress'}
+  ],
+  milestones:[
+    {id:'m1',text:'Testing Gateway 1: Clerk Test',after:'c2'},
+    {id:'m2',text:'Testing Gateway 2: Clerk & Auctioneer Test',after:'c3'},
+    {id:'m3',text:'Mock Auction (London)',after:'c4'},
+    {id:'m4',text:'Mock Auction (Global)',after:'c6'},
+    {id:'m5',text:'Pilot Auctions (Global) & Hypercare',after:'END'}
+  ],
+  logo:null
+};
+
+let D = JSON.parse(JSON.stringify(DEFAULTS));
+let unlocked = false;
+
+function load(){
+  try{ const v=localStorage.getItem(SK); if(v) D=JSON.parse(v); }catch(e){}
+}
+function save(){
+  try{
+    localStorage.setItem(SK,JSON.stringify(D));
+    const el=document.getElementById('save-ok');
+    if(el){el.textContent='✓ Saved '+new Date().toLocaleTimeString();setTimeout(()=>{if(el)el.textContent=''},3000);}
+    renderRadiator();
+  }catch(e){alert('Save failed: '+e.message);}
+}
+
+function getPassword(){
+  try{return localStorage.getItem(PK)||DEFAULT_PW;}catch(e){return DEFAULT_PW;}
+}
+function setPassword(p){
+  try{localStorage.setItem(PK,p);}catch(e){}
+}
+
+function openLock(){
+  document.getElementById('pw-modal').style.display='flex';
+  document.getElementById('pw-input').value='';
+  document.getElementById('pw-error').textContent='';
+  setTimeout(()=>document.getElementById('pw-input').focus(),50);
+}
+function closeLock(){
+  document.getElementById('pw-modal').style.display='none';
+}
+function checkPassword(){
+  const v=document.getElementById('pw-input').value;
+  if(v===getPassword()){
+    closeLock();
+    unlocked=true;
+    openSettings();
+  }else{
+    document.getElementById('pw-error').textContent='Incorrect password.';
+    document.getElementById('pw-input').select();
+  }
+}
+
+function openSettings(){
+  document.getElementById('radiator-view').style.display='none';
+  document.getElementById('settings-view').style.display='block';
+  renderSettings();
+}
+function closeSettings(){
+  document.getElementById('settings-view').style.display='none';
+  document.getElementById('radiator-view').style.display='block';
+  unlocked=false;
+}
+
+/* ── RENDER RADIATOR ─────────────────────── */
+function phCls(s){return s==='done'?'ph-done':s==='active'?'ph-active':s==='na'?'ph-na':'ph-upcoming';}
+function ragStyle(r){const c=RAG[r];return c?`background:${c}`:'background:#ccc;border:1px solid #bbb';}
+function fmtDate(d){
+  if(!d) return '';
+  try{
+    const dt=new Date(d+'T12:00:00');
+    return dt.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  }catch(e){return d;}
+}
+
+function renderRadiator(){
+  const byComp={};
+  (D.milestones||[]).forEach(m=>{
+    if(!byComp[m.after]) byComp[m.after]=[];
+    byComp[m.after].push(m.text);
+  });
+
+  function mileHtml(id){
+    return (byComp[id]||[]).map(t=>`
+      <div class="milestone-band">
+        <div class="milestone-line">
+          <div class="mile-dash"></div>
+          <div class="mile-chip">${t}</div>
+          <div class="mile-dash"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  function phRow(phases){
+    return PHASES.map((p,i)=>`<span class="ph ${phCls(phases[i]||'upcoming')}">${p}</span>`).join('');
+  }
+
+  let rows='';
+  D.components.forEach((c,ci)=>{
+    rows+=`<div class="comp-row${ci%2?'':' alt'}">
+      <div class="comp-name-wrap"><div class="comp-name">${c.name}</div></div>
+      <div class="phases">${phRow(c.phases)}</div>
+      <div class="prog-wrap">
+        <div class="prog-track"><div class="prog-fill" style="width:${c.progress}%"></div></div>
+        <div class="prog-pct">${c.progress}%</div>
+      </div>
+      <div class="rag-wrap"><div class="rag-dot" style="${ragStyle(c.rag)}"></div></div>
+      <div class="effort-text">${c.effort||''}</div>
+    </div>`;
+    (c.subRows||[]).forEach(s=>{
+      rows+=`<div class="comp-row sub">
+        <div class="comp-name-wrap"><div class="comp-sub-label">${s.label}</div></div>
+        <div class="phases">${phRow(s.phases)}</div>
+        <div class="prog-wrap">
+          <div class="prog-track"><div class="prog-fill" style="width:${s.progress}%"></div></div>
+          <div class="prog-pct">${s.progress}%</div>
+        </div>
+        <div class="rag-wrap"><div class="rag-dot" style="${ragStyle(s.rag)}"></div></div>
+        <div class="effort-text"></div>
+      </div>`;
+    });
+    rows+=mileHtml(c.id);
+  });
+  rows+=mileHtml('END');
+
+  const sumHtml=(D.summary||[]).filter(s=>s.trim()).map(s=>
+    `<div class="summary-item"><span class="sum-bullet">▸</span><span>${s}</span></div>`
+  ).join('');
+
+  document.getElementById('rad-content').innerHTML=`
+    <div class="rad-header">
+      <div>
+        <div class="rad-title">${D.title}</div>
+        <div class="rad-date">${fmtDate(D.date)}</div>
+      </div>
+      <div class="rad-header-right">
+        <div class="prog-badge"><span style="width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block"></span> On track</div>
+      </div>
+    </div>
+    ${sumHtml?`<div class="summary-band">
+      <div class="summary-label">Summary<br>update</div>
+      <div class="summary-items">${sumHtml}</div>
+    </div>`:''}
+    <div class="table-wrap">
+      <div class="col-headers">
+        <div class="col-h">Component</div>
+        <div class="col-h">Phase</div>
+        <div class="col-h">Progress (inc. design &amp; discovery)</div>
+        <div class="col-h">Status</div>
+        <div class="col-h">Effort</div>
+      </div>
+      ${rows}
+      <div class="legend-row">
+        <div class="leg"><div class="leg-dot" style="background:#16a34a"></div> On track</div>
+        <div class="leg"><div class="leg-dot" style="background:#d97706"></div> At risk</div>
+        <div class="leg"><div class="leg-dot" style="background:#dc2626"></div> Blocked</div>
+        <div class="leg"><div class="leg-dot" style="background:#ccc;border:1px solid #bbb"></div> Complete / N/A</div>
+        <div style="margin-left:20px;display:flex;gap:10px;align-items:center">
+          <div class="leg"><div class="leg-box" style="background:#161616"></div> Done</div>
+          <div class="leg"><div class="leg-box" style="background:#2563eb"></div> In progress</div>
+          <div class="leg"><div class="leg-box" style="background:#e8e6e0;border:1px solid #d8d5cc"></div> Upcoming</div>
+          <div class="leg"><div class="leg-box" style="border:1px solid #e0ddd5"></div> N/A</div>
+        </div>
+        ${D.logo?`<div style="margin-left:auto"><img class="logo-img" src="${D.logo}" alt="Logo"/></div>`:''}
+      </div>
+    </div>
+    <div class="conductor-section">
+      <div class="conductor-header">
+        <div class="conductor-title">How the components work together</div>
+        <div class="conductor-sub">Clerk Console drives all bid actions — everything else receives or feeds into it</div>
+      </div>
+      <div class="conductor-body">
+        <div style="display:flex;align-items:stretch;gap:0;position:relative;min-height:300px">
+
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;padding:12px 0;gap:14px;z-index:2">
+            <div style="font-size:11px;font-style:italic;color:#999;margin-bottom:-6px">Feeds bids and actions in</div>
+            <div class="cond-card cond-card-blue" id="cl0"><div class="cond-card-title">Registration Engine</div><div class="cond-card-sub">Staff add pre-sale bids and actions</div></div>
+            <div class="cond-card cond-card-blue" id="cl1"><div class="cond-card-title">Auction and Lot Details</div><div class="cond-card-sub">Clients place pre-sale bids</div></div>
+            <div class="cond-card cond-card-blue" id="cl2"><div class="cond-card-title">Live Bidding Page</div><div class="cond-card-sub">Real-time bids from online and mobile</div></div>
+          </div>
+
+          <div style="width:280px;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;z-index:2">
+            <div class="cond-hub" id="hub">
+              <div class="cond-hub-title">Clerk Console</div>
+              <div class="cond-hub-role">the conductor</div>
+              <div class="cond-hub-sub">Accepts bids,<br>advances lots</div>
+            </div>
+          </div>
+
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;padding:12px 0;gap:14px;z-index:2">
+            <div style="font-size:11px;font-style:italic;color:#999;margin-bottom:-6px">Information Display Units</div>
+            <div class="cond-card cond-card-teal" id="cr0"><div class="cond-card-title">Auctioneer Console</div><div class="cond-card-sub">Live view for the auctioneer</div></div>
+            <div style="flex:1"></div>
+            <div class="cond-card cond-card-teal" id="cr1"><div class="cond-card-title">Auction Room Display</div><div class="cond-card-sub">Big screen in the saleroom</div></div>
+          </div>
+
+          <svg id="cond-svg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible">
+            <defs>
+              <marker id="arri" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="#C79A3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </marker>
+              <marker id="arro" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="#C79A3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+      </div>
+    </div>`;
+  setTimeout(drawArrows, 80);
+}
+
+/* ── RENDER SETTINGS ─────────────────────── */
+function ragPicker(ci,si,cur,field){
+  const base=si!=null?`D.components[${ci}].subRows[${si}]`:`D.components[${ci}]`;
+  return ['green','amber','red','none'].map(r=>`
+    <div class="rag-opt${cur===r?' sel':''}"
+      style="background:${RAG[r]||'#ddd'};${r==='none'?'border:1px solid #ccc':''}"
+      onclick="${base}.${field}='${r}';renderSettings()"
+      title="${r==='none'?'Complete/N/A':r}"></div>`).join('');
+}
+
+function phaseSelects(phases,path){
+  return PHASES.map((p,pi)=>`
+    <div class="phase-col">
+      <div class="ph-lbl">${p}</div>
+      <select class="s-in w-xs" style="font-size:10px;padding:3px 4px"
+        onchange="${path}[${pi}]=this.value;renderSettings()">
+        ${['done','active','upcoming','na'].map(v=>`<option value="${v}"${phases[pi]===v?' selected':''}>${v}</option>`).join('')}
+      </select>
+    </div>`).join('');
+}
+
+function renderSettings(){
+  const compHtml=D.components.map((c,ci)=>{
+    const subHtml=(c.subRows||[]).map((s,si)=>`
+      <div class="sub-card">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Sub-row</div>
+        <div class="s-row">
+          <div class="s-field"><div class="s-lbl">Label</div>
+            <input class="s-in w-xs" value="${s.label}" onchange="D.components[${ci}].subRows[${si}].label=this.value"/>
+          </div>
+          <div class="s-field"><div class="s-lbl">Progress %</div>
+            <input class="s-in w-xs" type="number" min="0" max="100" value="${s.progress}"
+              onchange="D.components[${ci}].subRows[${si}].progress=+this.value"/>
+          </div>
+          <div class="s-field"><div class="s-lbl">RAG</div>
+            <div class="rag-row">${ragPicker(ci,si,s.rag,'rag')}</div>
+          </div>
+          <button class="btn btn-danger btn-sm" style="align-self:flex-end"
+            onclick="D.components[${ci}].subRows.splice(${si},1);renderSettings()">Remove</button>
+        </div>
+        <div class="s-lbl" style="margin-bottom:5px">Phases</div>
+        <div class="phase-row">${phaseSelects(s.phases,`D.components[${ci}].subRows[${si}].phases`)}</div>
+      </div>`).join('');
+
+    return `<div class="comp-card">
+      <div class="comp-card-hdr">
+        <div class="s-field" style="flex:1">
+          <div class="s-lbl">Name</div>
+          <input class="s-in w-lg" value="${c.name}" onchange="D.components[${ci}].name=this.value"/>
+        </div>
+        <div class="s-field"><div class="s-lbl">Progress %</div>
+          <input class="s-in w-xs" type="number" min="0" max="100" value="${c.progress}"
+            onchange="D.components[${ci}].progress=+this.value"/>
+        </div>
+        <div class="s-field"><div class="s-lbl">RAG</div>
+          <div class="rag-row">${ragPicker(ci,null,c.rag,'rag')}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" style="align-self:flex-end"
+          onclick="D.components.splice(${ci},1);renderSettings()">Remove</button>
+      </div>
+      <div class="s-row">
+        <div class="s-field" style="flex:1"><div class="s-lbl">Effort / notes</div>
+          <input class="s-in w-full" style="min-width:260px" value="${c.effort||''}"
+            onchange="D.components[${ci}].effort=this.value"/>
+        </div>
+      </div>
+      <div class="s-lbl" style="margin-bottom:6px">Phases</div>
+      <div class="phase-row" style="margin-bottom:10px">${phaseSelects(c.phases,`D.components[${ci}].phases`)}</div>
+      ${subHtml}
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px"
+        onclick="D.components[${ci}].subRows.push({id:'s'+Date.now(),label:'WEB',phases:['upcoming','upcoming','upcoming','upcoming','upcoming'],progress:0,rag:'green'});renderSettings()">
+        + Add sub-row
+      </button>
+    </div>`;
+  }).join('');
+
+  const mileHtml=(D.milestones||[]).map((m,mi)=>`
+    <div class="mile-row">
+      <div class="s-field" style="flex:2"><div class="s-lbl">Milestone text</div>
+        <input class="s-in" style="width:100%" value="${m.text}"
+          onchange="D.milestones[${mi}].text=this.value"/>
+      </div>
+      <div class="s-field"><div class="s-lbl">Show after</div>
+        <select class="s-in w-md" onchange="D.milestones[${mi}].after=this.value">
+          ${D.components.map(c=>`<option value="${c.id}"${m.after===c.id?' selected':''}>${c.name}</option>`).join('')}
+          <option value="END"${m.after==='END'?' selected':''}>— End of table —</option>
+        </select>
+      </div>
+      <button class="btn btn-danger btn-sm" style="align-self:flex-end"
+        onclick="D.milestones.splice(${mi},1);renderSettings()">Remove</button>
+    </div>`).join('');
+
+  document.getElementById('settings-body').innerHTML=`
+    <div class="save-bar">
+      <button class="btn btn-gold" onclick="save()">💾 Save all changes</button>
+      <span id="save-ok" class="save-ok"></span>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto"
+        onclick="if(confirm('Reset to defaults?')){D=JSON.parse(JSON.stringify(DEFAULTS));renderSettings();}">Reset</button>
+    </div>
+
+    <div class="s-card">
+      <div class="s-card-title">📋 Page header</div>
+      <div class="s-row">
+        <div class="s-field" style="flex:1"><div class="s-lbl">Title</div>
+          <input class="s-in" style="width:100%" value="${D.title}" onchange="D.title=this.value"/>
+        </div>
+        <div class="s-field"><div class="s-lbl">Report date</div>
+          <input class="s-in w-md" type="date" value="${D.date}" onchange="D.date=this.value"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="s-card">
+      <div class="s-card-title">📝 Summary update (2–4 points)</div>
+      ${(D.summary||[]).map((s,i)=>`
+        <div class="sum-row">
+          <span style="color:var(--gold);font-size:11px">▸</span>
+          <input value="${s}" placeholder="Point ${i+1}…" onchange="D.summary[${i}]=this.value"/>
+          <button class="btn btn-danger btn-sm"
+            onclick="D.summary.splice(${i},1);renderSettings()">✕</button>
+        </div>`).join('')}
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px"
+        onclick="D.summary.push('');renderSettings()">+ Add point</button>
+    </div>
+
+    <div class="s-card">
+      <div class="s-card-title">🏗 Components
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto"
+          onclick="D.components.push({id:'c'+Date.now(),name:'New component',subRows:[],phases:['upcoming','upcoming','upcoming','upcoming','upcoming'],progress:0,rag:'green',effort:''});renderSettings()">
+          + Add component</button>
+      </div>
+      ${compHtml}
+    </div>
+
+    <div class="s-card">
+      <div class="s-card-title">🏁 Milestone lines
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto"
+          onclick="D.milestones.push({id:'m'+Date.now(),text:'New milestone',after:'END'});renderSettings()">
+          + Add milestone</button>
+      </div>
+      ${mileHtml||'<div style="color:var(--muted);font-size:13px">No milestones yet.</div>'}
+    </div>
+
+    <div class="s-card">
+      <div class="s-card-title">🖼 Logo (bottom right)</div>
+      <div class="drop-zone" id="dz"
+        ondragover="event.preventDefault();this.classList.add('over')"
+        ondragleave="this.classList.remove('over')"
+        ondrop="dropLogo(event)"
+        onclick="document.getElementById('li').click()">
+        ${D.logo?`<img src="${D.logo}" style="max-height:52px;max-width:180px;object-fit:contain;margin:0 auto;display:block"/><div style="margin-top:8px;font-size:12px">Click or drag to replace</div>`:`<div style="font-size:28px;margin-bottom:6px">🖼</div>Click or drag an image here`}
+      </div>
+      <input type="file" id="li" accept="image/*" style="display:none" onchange="logoFile(this.files[0])"/>
+      ${D.logo?`<button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="D.logo=null;renderSettings()">Remove logo</button>`:''}
+    </div>
+
+    <div class="s-card">
+      <div class="s-card-title">🔑 Change password</div>
+      <div class="pw-change">
+        <div class="pw-change-title">Settings password</div>
+        <div class="s-row">
+          <div class="s-field"><div class="s-lbl">New password</div>
+            <input class="s-in w-md" type="password" id="pw-new" placeholder="New password"/>
+          </div>
+          <div class="s-field"><div class="s-lbl">Confirm</div>
+            <input class="s-in w-md" type="password" id="pw-confirm" placeholder="Confirm"/>
+          </div>
+          <button class="btn btn-gold btn-sm" style="align-self:flex-end" onclick="changePw()">Update</button>
+        </div>
+        <div id="pw-msg" style="font-size:12px;margin-top:4px"></div>
+      </div>
+    </div>`;
+}
+
+function changePw(){
+  const a=document.getElementById('pw-new').value;
+  const b=document.getElementById('pw-confirm').value;
+  const msg=document.getElementById('pw-msg');
+  if(!a){msg.style.color='#dc2626';msg.textContent='Enter a new password.';return;}
+  if(a!==b){msg.style.color='#dc2626';msg.textContent='Passwords do not match.';return;}
+  setPassword(a);
+  msg.style.color='#16a34a';
+  msg.textContent='✓ Password updated.';
+  document.getElementById('pw-new').value='';
+  document.getElementById('pw-confirm').value='';
+}
+
+function dropLogo(e){
+  e.preventDefault();
+  document.getElementById('dz').classList.remove('over');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('image/')) logoFile(f);
+}
+function logoFile(f){
+  if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{D.logo=e.target.result;renderSettings();};
+  r.readAsDataURL(f);
+}
+
+function init(){
+  load();
+  renderRadiator();
+}
+
+function drawArrows(){
+  const svg = document.getElementById('cond-svg');
+  if(!svg) return;
+  const hub = document.getElementById('hub');
+  const leftEls = ['cl0','cl1','cl2'].map(id=>document.getElementById(id));
+  const rightEls = ['cr0','cr1'].map(id=>document.getElementById(id));
+  if(!hub || leftEls.some(e=>!e) || rightEls.some(e=>!e)) return;
+
+  const NS = 'http://www.w3.org/2000/svg';
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const defs = document.createElementNS(NS,'defs');
+  ['arri','arro'].forEach(id=>{
+    const m = document.createElementNS(NS,'marker');
+    m.setAttribute('id',id);
+    m.setAttribute('viewBox','0 0 10 10');
+    m.setAttribute('refX','7'); m.setAttribute('refY','5');
+    m.setAttribute('markerWidth','5'); m.setAttribute('markerHeight','5');
+    m.setAttribute('orient','auto');
+    const p = document.createElementNS(NS,'path');
+    p.setAttribute('d','M2 1L8 5L2 9');
+    p.setAttribute('fill','none'); p.setAttribute('stroke','#C79A3E');
+    p.setAttribute('stroke-width','2'); p.setAttribute('stroke-linecap','round');
+    m.appendChild(p); defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  const svgRect = svg.parentElement.getBoundingClientRect();
+  function mid(el){
+    const r = el.getBoundingClientRect();
+    return {
+      left:  r.left   - svgRect.left,
+      right: r.right  - svgRect.left,
+      midY:  (r.top + r.bottom)/2 - svgRect.top
+    };
+  }
+
+  function makeLine(x1,y1,x2,y2,markerId,animDir){
+    const l = document.createElementNS(NS,'line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y1);
+    l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+    l.setAttribute('stroke','#C79A3E');
+    l.setAttribute('stroke-width','2');
+    l.setAttribute('stroke-dasharray','6 7');
+    l.setAttribute('marker-end',`url(#${markerId})`);
+    l.style.animation = `${animDir} 1s linear infinite`;
+    svg.appendChild(l);
+  }
+
+  const h = mid(hub);
+  leftEls.forEach(el=>{ const c=mid(el); makeLine(c.right,c.midY,h.left,h.midY,'arri','dashin'); });
+  rightEls.forEach(el=>{ const c=mid(el); makeLine(h.right,h.midY,c.left,c.midY,'arro','dashout'); });
+}
+
+window.addEventListener('resize',()=>setTimeout(drawArrows,50));
+init();
+</script>
+</body>
+</html>
