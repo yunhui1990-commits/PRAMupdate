@@ -213,6 +213,7 @@ const DEFAULT_PW = 'pram2026';
 const GIST_ID = 'b75c659d38518125dd0d777ed8a482d7';
 const GIST_FILE = 'pram-data.json';
 const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
+const GIST_RAW = `https://gist.githubusercontent.com/yunhui1990/${GIST_ID}/raw/${GIST_FILE}`;
 function getToken(){ try{ return localStorage.getItem('pram_gist_token')||''; }catch(e){ return ''; } }
 function setToken(t){ try{ localStorage.setItem('pram_gist_token',t); }catch(e){} }
 
@@ -257,10 +258,9 @@ let D = JSON.parse(JSON.stringify(DEFAULTS));
 let unlocked = false;
 
 async function load(){
-  // Raw Gist URL works without auth for any gist (secret or public)
-  const rawUrl = `https://gist.githubusercontent.com/yunhui1990/${GIST_ID}/raw/${GIST_FILE}`;
+  // Try raw Gist URL first — no auth needed, works for anyone
   try{
-    const r = await fetch(rawUrl + '?t=' + Date.now()); // cache-bust
+    const r = await fetch(GIST_RAW + '?t=' + Date.now());
     if(r.ok){
       const text = await r.text();
       if(text && text.trim() !== '{}' && text.trim() !== ''){
@@ -276,10 +276,10 @@ async function load(){
 
 async function save(){
   const token = getToken();
-  if(!token){ alert('No GitHub token set — go to Settings and enter your token first.'); return; }
+  if(!token){ alert('No GitHub token set.\n\nGo to Settings → GitHub Token and enter your Personal Access Token first.'); return; }
   const json = JSON.stringify(D, null, 2);
   const saveEl = document.getElementById('save-ok');
-  if(saveEl) saveEl.textContent = '⏳ Saving…';
+  if(saveEl) saveEl.textContent = '⏳ Saving to Gist…';
   try{
     const r = await fetch(GIST_API, {
       method:'PATCH',
@@ -290,9 +290,9 @@ async function save(){
       },
       body: JSON.stringify({files:{[GIST_FILE]:{content:json}}})
     });
-    if(!r.ok) throw new Error(`GitHub returned ${r.status}`);
+    if(!r.ok) throw new Error(`GitHub returned ${r.status} — check your token has gist scope`);
     localStorage.setItem(SK, json);
-    if(saveEl){saveEl.textContent='✓ Saved to Gist '+new Date().toLocaleTimeString();setTimeout(()=>{if(saveEl)saveEl.textContent=''},4000);}
+    if(saveEl){saveEl.textContent='✓ Saved to Gist · '+new Date().toLocaleTimeString();setTimeout(()=>{if(saveEl)saveEl.textContent=''},4000);}
     renderRadiator();
   }catch(e){
     if(saveEl) saveEl.textContent='';
@@ -644,29 +644,27 @@ function renderSettings(){
     </div>
 
     <div class="s-card">
-      <div class="s-card-title">🔑 GitHub token (stored locally only — never in the HTML file)</div>
+      <div class="s-card-title">🔗 GitHub token (for saving to Gist)</div>
       <div class="pw-change">
-        <div class="pw-change-title">Personal Access Token (gist scope)</div>
+        <div class="pw-change-title">Personal Access Token — gist scope only</div>
         <div class="s-row">
           <div class="s-field" style="flex:1">
             <div class="s-lbl">Token</div>
-            <input class="s-in w-full" type="password" id="gist-token-input"
-              placeholder="ghp_…"
-              value="${getToken()}"
-              style="font-family:monospace"/>
+            <input class="s-in" style="width:100%;font-family:monospace" type="password"
+              id="gist-token-input" placeholder="ghp_…" value="${getToken()}"/>
           </div>
           <button class="btn btn-gold btn-sm" style="align-self:flex-end"
-            onclick="setToken(document.getElementById('gist-token-input').value);document.getElementById('token-msg').textContent='✓ Token saved locally';setTimeout(()=>document.getElementById('token-msg').textContent='',3000)">
+            onclick="setToken(document.getElementById('gist-token-input').value);document.getElementById('token-msg').textContent='✓ Token saved';document.getElementById('token-msg').style.color='#16a34a';setTimeout(()=>document.getElementById('token-msg').textContent='',3000)">
             Save token
           </button>
         </div>
-        <div id="token-msg" style="font-size:12px;color:var(--green);margin-top:4px"></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px">This token is saved only in your browser's localStorage — it is never written to the HTML file or pushed to GitHub.</div>
+        <div id="token-msg" style="font-size:12px;margin-top:4px"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Stored only in your browser — never written to the HTML file. Anyone can read the page; only you can save changes.</div>
       </div>
     </div>
 
     <div class="s-card">
-      <div class="s-card-title">🔒 Change settings password</div>
+      <div class="s-card-title">🔑 Change password</div>
       <div class="pw-change">
         <div class="pw-change-title">Settings password</div>
         <div class="s-row">
@@ -709,13 +707,9 @@ function logoFile(f){
   r.readAsDataURL(f);
 }
 
-async function init(){
-  // Render defaults immediately so page is never blank
+function init(){
+  load();
   renderRadiator();
-  // Then try to load from Gist and re-render if we got data
-  const before = JSON.stringify(D);
-  await load();
-  if(JSON.stringify(D) !== before) renderRadiator();
 }
 
 function drawArrows(){
@@ -773,6 +767,14 @@ function drawArrows(){
 }
 
 window.addEventListener('resize',()=>setTimeout(drawArrows,50));
+
+async function init(){
+  renderRadiator(); // show defaults immediately — never blank
+  const before = JSON.stringify(D);
+  await load();
+  if(JSON.stringify(D) !== before) renderRadiator();
+}
+
 init();
 </script>
 </body>
